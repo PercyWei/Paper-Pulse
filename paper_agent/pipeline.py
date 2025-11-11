@@ -505,8 +505,9 @@ def filter_papers_by_categories(papers: Iterable[RawPaper]) -> List[RawPaper]:
             continue
         has_required = bool(categories & required)
         has_optional = bool(categories & optional)
-        if has_required or has_optional:
-            retained.append(paper)
+        retained.append(paper)
+        # if has_required or has_optional:
+        #     retained.append(paper)
     LOGGER.info(
         "Category filter retained %d papers out of %d (skipped %d without categories, bypassed %d non-arXiv sources).",
         len(retained),
@@ -752,7 +753,8 @@ def build_daily_report(
             if len(reasoning) > 0:
                 reasoning = reasoning.replace("\n", " ").strip()
             categories = ", ".join(paper.paper.categories) if paper.paper.categories else "Not provided"
-            title_line = f"{paper.rank}. {paper.paper.title} (Score: {paper.relevance_score:.2f})"
+            title_text = " ".join(paper.paper.title.split())
+            title_line = f"{paper.rank}. {title_text}"
             lines.extend(
                 [
                     f"**{title_line}**",

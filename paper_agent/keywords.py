@@ -19,20 +19,23 @@ class KeywordConfig:
     required_keywords: List[str]
 
 DEFAULT_LAYER1_KEYWORDS: tuple[str, ...] = (
-    "safety",
-    "safe",
-    "bias",
-    "debias",
-    "jailbreak",
-    "red team",
-    "red teaming",
-    "adversarial attack",
-    "adversarial defense",
-    "defense",
-    "poisoning",
-    "privacy",
-    "hallucination",
-    "interpretability",
+    # "safety",
+    # "safe",
+    # "bias",
+    # "debias",
+    # "jailbreak",
+    # "red team",
+    # "red teaming",
+    # "adversarial attack",
+    # "adversarial defense",
+    # "defense",
+    # "poisoning",
+    # "privacy",
+    # "hallucination",
+    # "interpretability",
+    "metasurface",
+    "sensing",
+    "optical computing"
 )
 
 DEFAULT_REQUIRED_KEYWORDS: tuple[str, ...] = ()
