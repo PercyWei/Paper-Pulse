@@ -65,7 +65,7 @@ def generate_recommendations(settings: PipelineSettings) -> PipelineResult:
         "enabled" if should_send_email else "disabled",
     )
     cache = CacheManager()
-    init_step_index = log_step("初始化数据源与客户端")
+    init_step_index = log_step("Initializing data sources and clients")
     llm = LLMClient()
     raw_papers = cache.load_raw_papers(settings)
     fetchers: List[PaperFetcher] = []
@@ -76,7 +76,7 @@ def generate_recommendations(settings: PipelineSettings) -> PipelineResult:
                 f"No valid fetchers available for requested sources: {', '.join(settings.sources)}."
             )
         LOGGER.info(
-            "[Step %d/%d] 已准备 %d 个数据源：%s",
+            "[Step %d/%d] Prepared %d data sources: %s",
             init_step_index,
             total_steps,
             len(fetchers),
@@ -84,7 +84,7 @@ def generate_recommendations(settings: PipelineSettings) -> PipelineResult:
         )
     else:
         LOGGER.info(
-            "[Step %d/%d] 缓存命中，跳过数据源初始化（sources: %s）。",
+            "[Step %d/%d] Cache hit, skipping data source initialization (sources: %s).",
             init_step_index,
             total_steps,
             source_descriptor,
@@ -92,7 +92,7 @@ def generate_recommendations(settings: PipelineSettings) -> PipelineResult:
 
     raw_key: Optional[str] = None
     if raw_papers is None:
-        fetch_step_index = log_step("拉取原始论文数据")
+        fetch_step_index = log_step("Fetching raw paper data")
         fetch_kwargs = {
             "target_date": settings.target_date,
             "start_date": settings.start_date,
@@ -103,7 +103,7 @@ def generate_recommendations(settings: PipelineSettings) -> PipelineResult:
         total_collected = 0
         for idx, fetcher in enumerate(fetchers, start=1):
             LOGGER.info(
-                "[Step %d/%d] 拉取进度 %d/%d -> 来源 %s",
+                "[Step %d/%d] Fetching progress %d/%d -> source %s",
                 fetch_step_index,
                 total_steps,
                 idx,
@@ -143,9 +143,9 @@ def generate_recommendations(settings: PipelineSettings) -> PipelineResult:
         )
     else:
         raw_key = cache.raw_key(settings)
-        fetch_step_index = log_step("加载缓存的原始论文数据")
+        fetch_step_index = log_step("Loading cached raw paper data")
         LOGGER.info(
-            "[Step %d/%d] 从缓存加载 %d 篇原始论文 (key=%s)。",
+            "[Step %d/%d] Loaded %d raw papers from cache (key=%s).",
             fetch_step_index,
             total_steps,
             len(raw_papers),
@@ -164,7 +164,7 @@ def generate_recommendations(settings: PipelineSettings) -> PipelineResult:
         len(keywords),
         len(required_keywords),
     )
-    filter_step_index = log_step("应用 Layer 1 过滤器")
+    filter_step_index = log_step("Applying Layer 1 filters")
     LOGGER.info(
         "Fetched %d papers for %s from sources %s. Applying Layer 1 category and keyword filters.",
         len(raw_papers),
@@ -219,7 +219,7 @@ def generate_recommendations(settings: PipelineSettings) -> PipelineResult:
         settings.max_results_per_topic if settings.max_results_per_topic > 0 else "none",
     )
 
-    log_step("执行 LLM 分类")
+    log_step("Performing LLM classification")
     classification_system_prompt = build_classification_system_prompt(keywords, required_keywords)
     classified = classify_with_llm(
         llm,
@@ -234,7 +234,7 @@ def generate_recommendations(settings: PipelineSettings) -> PipelineResult:
     if not classified:
         raise ValueError("LLM classification returned no valid papers.")
 
-    log_step("排序并选出核心论文")
+    log_step("Ranking and selecting core papers")
     ranked_all = HybridRanker().rank(classified)
     relevant_ranked = [
         paper
@@ -253,10 +253,10 @@ def generate_recommendations(settings: PipelineSettings) -> PipelineResult:
         for idx, paper in enumerate(relevant_ranked, start=1)
     ]
     relevant_ranked, missing_summaries = _apply_cached_summaries(cache, relevant_ranked)
-    summary_step_index = log_step("生成 LLM 摘要")
+    summary_step_index = log_step("Generating LLM summaries")
     if missing_summaries > 0:
         LOGGER.info(
-            "[Step %d/%d] 将为 %d 篇论文生成或更新摘要，其余摘要来自缓存。",
+            "[Step %d/%d] Will generate or update summaries for %d papers, remaining summaries from cache.",
             summary_step_index,
             total_steps,
             missing_summaries,
@@ -267,11 +267,11 @@ def generate_recommendations(settings: PipelineSettings) -> PipelineResult:
                 cache.store_summary(ranked_paper.paper, ranked_paper.summary)
     else:
         LOGGER.info(
-            "[Step %d/%d] 全部摘要从缓存加载，跳过 LLM 调用。",
+            "[Step %d/%d] All summaries loaded from cache, skipping LLM calls.",
             summary_step_index,
             total_steps,
         )
-    log_step("构建日报内容")
+    log_step("Building daily report content")
     email_subject, email_body = build_daily_report(
         relevant_ranked,
         focus,
@@ -280,7 +280,7 @@ def generate_recommendations(settings: PipelineSettings) -> PipelineResult:
     )
 
     if should_send_email:
-        log_step("发送邮件通知")
+        log_step("Sending email notification")
         EmailClient(email_config).send_markdown_email(
             subject=email_subject,
             body_markdown=email_body,
@@ -288,7 +288,7 @@ def generate_recommendations(settings: PipelineSettings) -> PipelineResult:
         )
 
     LOGGER.info(
-        "Pipeline completed for %s. 最终报告共包含 %d 篇论文。",
+        "Pipeline completed for %s. Final report contains %d papers.",
         date_descriptor,
         len(relevant_ranked),
     )
@@ -383,14 +383,14 @@ def generate_gap_fill_digest(
         for ranked_paper in relevant_ranked:
             if ranked_paper.summary:
                 cache.store_summary(ranked_paper.paper, ranked_paper.summary)
-    date_descriptor = f"{week_start.isoformat()} 至 {week_end.isoformat()}（关键词补漏）"
+    date_descriptor = f"{week_start.isoformat()} to {week_end.isoformat()} (keyword gap-fill)"
     _, email_body = build_daily_report(
         relevant_ranked,
         focus,
         date_descriptor,
         source_descriptor,
     )
-    email_subject = f"每周 LLM Safety 补漏 ({week_start.isoformat()} 至 {week_end.isoformat()})"
+    email_subject = f"Weekly LLM Safety Gap-Fill ({week_start.isoformat()} to {week_end.isoformat()})"
     if should_send_email and email_config:
         EmailClient(email_config).send_markdown_email(
             subject=email_subject,
@@ -577,8 +577,8 @@ def classify_with_llm(
     pending_papers: List[RawPaper] = []
     cached_exact = 0
     cached_fallback = 0
-    keywords_text = ", ".join(keywords) if keywords else "未提供"
-    required_keywords_text = ", ".join(required_keywords) if required_keywords else "无"
+    keywords_text = ", ".join(keywords) if keywords else "Not provided"
+    required_keywords_text = ", ".join(required_keywords) if required_keywords else "None"
 
     for paper in paper_list:
         cached_result: Optional[ClassifiedPaper] = None
@@ -733,16 +733,16 @@ def build_daily_report(
     sources_descriptor: str,
 ) -> tuple[str, str]:
     ranked_list = list(ranked)
-    subject = f"每日 LLM Safety 论文速递 ({date_descriptor})"
+    subject = f"Daily LLM Safety Paper Digest ({date_descriptor})"
     lines: List[str] = [
-        f"# 每日 LLM Safety 论文速递 ({date_descriptor})",
+        f"# Daily LLM Safety Paper Digest ({date_descriptor})",
         "",
-        f"*聚焦领域:* {focus or 'LLM Safety'}",
-        f"*数据源:* {sources_descriptor or '未知'}",
+        f"*Research Focus:* {focus or 'LLM Safety'}",
+        f"*Data Sources:* {sources_descriptor or 'Unknown'}",
         "",
     ]
     if not ranked_list:
-        lines.append("今日未找到满足条件的论文，建议调低阈值或扩大检索范围。")
+        lines.append("No papers found matching the criteria today. Consider lowering the threshold or expanding the search range.")
     else:
         for paper in ranked_list:
             summary = (paper.summary or paper.paper.summary or "").strip()
@@ -751,17 +751,17 @@ def build_daily_report(
             reasoning = (paper.reasoning or "").strip()
             if len(reasoning) > 0:
                 reasoning = reasoning.replace("\n", " ").strip()
-            categories = ", ".join(paper.paper.categories) if paper.paper.categories else "未提供"
-            title_line = f"{paper.rank}. {paper.paper.title} (分数: {paper.relevance_score:.2f})"
+            categories = ", ".join(paper.paper.categories) if paper.paper.categories else "Not provided"
+            title_line = f"{paper.rank}. {paper.paper.title} (Score: {paper.relevance_score:.2f})"
             lines.extend(
                 [
                     f"**{title_line}**",
-                    f"- **主题:** {paper.main_topic or 'Other'}",
-                    f"- **LLM 评估:** {reasoning or '暂无说明'}",
-                    f"- **摘要:** {summary or '暂无摘要'}",
-                    f"- **arXiv 分类:** {categories}",
-                    f"- **来源:** {paper.paper.source}",
-                    f"- **链接:** {paper.paper.link}",
+                    f"- **Topic:** {paper.main_topic or 'Other'}",
+                    f"- **LLM Assessment:** {reasoning or 'No explanation'}",
+                    f"- **Summary:** {summary or 'No summary'}",
+                    f"- **arXiv Categories:** {categories}",
+                    f"- **Source:** {paper.paper.source}",
+                    f"- **Link:** {paper.paper.link}",
                     "",
                 ]
             )

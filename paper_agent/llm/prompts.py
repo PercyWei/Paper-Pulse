@@ -27,16 +27,16 @@ Guidelines:
 
 
 CLASSIFICATION_USER_PROMPT_TEMPLATE = """\
-你是一位专门研究大型语言模型安全（LLM Safety）的资深研究员。请根据以下论文信息完成评估：
+You are a senior researcher specializing in large language model safety (LLM Safety). Please evaluate the following paper:
 
-研究焦点: {focus}
-关键词列表: {keywords}
-必含关键词（至少命中其中一个）: {required_keywords}
-论文题目: {title}
-摘要: {abstract}
-arXiv 分类: {categories}
+Research Focus: {focus}
+Keyword List: {keywords}
+Required Keywords (at least one must match): {required_keywords}
+Paper Title: {title}
+Abstract: {abstract}
+arXiv Categories: {categories}
 
-请仅输出 JSON，且字段必须严格为 is_relevant、relevance_score、reasoning、main_topic。
+Output JSON only, with fields strictly: is_relevant, relevance_score, reasoning, main_topic.
 """
 
 

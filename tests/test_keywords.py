@@ -43,11 +43,11 @@ class ResolveKeywordsTestCase(unittest.TestCase):
         content = textwrap.dedent(
             """
             keyword_groups:
-              - name: 安全
+              - name: Security
                 keywords:
                   - defence
                   - Security
-              - name: 可靠性
+              - name: Reliability
                 items:
                   - robustness
                   - trustworthy

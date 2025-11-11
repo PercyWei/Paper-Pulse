@@ -2,53 +2,53 @@ import smtplib
 from email.message import EmailMessage
 import ssl
 
-# --- 1. 配置你的邮件信息 ---
+# --- 1. Configure your email information ---
 
-# SMTP 服务器地址和端口 (这里以 Gmail 为例)
+# SMTP server address and port (using Gmail as an example)
 # - Gmail: ('smtp.gmail.com', 587)
-# - 163邮箱: ('smtp.163.com', 587 或 465)
-# - QQ邮箱: ('smtp.qq.com', 587 或 465)
+# - 163 Mail: ('smtp.163.com', 587 or 465)
+# - QQ Mail: ('smtp.qq.com', 587 or 465)
 SMTP_SERVER = 'smtp.163.com'
-SMTP_PORT = 465  # 对于 STARTTLS
+SMTP_PORT = 465  # For STARTTLS
 
-SENDER_EMAIL = '17799138830@163.com'       # 你的邮箱地址
-SENDER_PASSWORD = 'SAcjU37U7dH5VsXA'  # 你的 "应用专用密码"
-RECEIVER_EMAIL = 'yangjunx21@gmail.com' # 收件人邮箱地址
+SENDER_EMAIL = '17799138830@163.com'       # Your email address
+SENDER_PASSWORD = 'SAcjU37U7dH5VsXA'  # Your "application-specific password"
+RECEIVER_EMAIL = 'yangjunx21@gmail.com' # Recipient email address
 
 # ----------------------------
 
 
-# --- 2. 创建邮件对象 ---
+# --- 2. Create email message ---
 msg = EmailMessage()
-msg['Subject'] = '【163 邮箱 Port 465】测试邮件' # 邮件主题
-msg['From'] = SENDER_EMAIL                   # 发件人
-msg['To'] = RECEIVER_EMAIL                     # 收件人
-msg.set_content('你好，\n\n这是使用 163 邮箱 465 端口发送的邮件正文。\n\n祝好！') # 邮件正文
+msg['Subject'] = '[163 Mail Port 465] Test Email' # Email subject
+msg['From'] = SENDER_EMAIL                   # Sender
+msg['To'] = RECEIVER_EMAIL                     # Recipient
+msg.set_content('Hello,\n\nThis is the email body sent using 163 Mail port 465.\n\nBest regards!') # Email body
 
-print("正在创建邮件...")
+print("Creating email...")
 
-# --- 3. 连接并发送邮件 (使用 SMTP_SSL) ---
+# --- 3. Connect and send email (using SMTP_SSL) ---
 try:
-    # 创建一个默认的 SSL 上下文
+    # Create a default SSL context
     context = ssl.create_default_context()
     
-    print(f"正在通过 SSL 连接到 {SMTP_SERVER}:{SMTP_PORT}...")
+    print(f"Connecting via SSL to {SMTP_SERVER}:{SMTP_PORT}...")
     
-    # 使用 smtplib.SMTP_SSL()，它会立即建立 SSL 连接
+    # Use smtplib.SMTP_SSL(), which establishes SSL connection immediately
     with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context) as server:
         
-        # 登录 SMTP 服务器
-        # 再次确认: SENDER_PASSWORD 必须是 163 邮箱设置中生成的 "授权码"
+        # Login to SMTP server
+        # Note: SENDER_PASSWORD must be the "authorization code" generated in 163 Mail settings
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        print("登录成功！")
+        print("Login successful!")
         
-        # 发送邮件
+        # Send email
         server.send_message(msg)
-        print(f"邮件已成功发送至 {RECEIVER_EMAIL}！")
+        print(f"Email successfully sent to {RECEIVER_EMAIL}!")
         
-        # (使用 'with' 语句，连接会自动关闭)
+        # (Connection will automatically close with 'with' statement)
 
 except smtplib.SMTPException as e:
-    print(f"SMTP 错误: {e}")
+    print(f"SMTP error: {e}")
 except Exception as e:
-    print(f"发送邮件时出错: {e}")
+    print(f"Error sending email: {e}")
