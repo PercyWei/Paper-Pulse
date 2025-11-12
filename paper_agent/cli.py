@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import json
 import logging
-from datetime import date, datetime
-from typing import List
+import time
+from datetime import date, datetime, timedelta, timezone
+from typing import Optional, Tuple
 
 from .models import AVAILABLE_SOURCES, PipelineSettings
 from .pipeline import generate_gap_fill_digest, generate_recommendations
@@ -15,6 +15,16 @@ def _valid_date(value: str) -> date:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError as exc:
         raise argparse.ArgumentTypeError(f"Invalid date '{value}'. Expected YYYY-MM-DD.") from exc
+
+
+def _positive_int(value: str) -> int:
+    try:
+        parsed = int(value, 10)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"Invalid integer '{value}'.") from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("Value must be a positive integer.")
+    return parsed
 
 
 def parse_args() -> argparse.Namespace:
@@ -99,29 +109,31 @@ def parse_args() -> argparse.Namespace:
         type=int,
         help="Optional cap on the number of cached candidates to evaluate during a gap-fill run.",
     )
+    parser.add_argument(
+        "--repeat-every-days",
+        type=_positive_int,
+        help="Enable daemon mode and rerun the pipeline every N days.",
+    )
+    parser.add_argument(
+        "--service-window-days",
+        type=_positive_int,
+        help="Size of the rolling date window (in days) when daemon mode is active. Defaults to N from --repeat-every-days.",
+    )
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
-    log_level = getattr(logging, str(args.log_level).upper(), logging.INFO)
-    logging.basicConfig(
-        level=log_level,
-        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-    )
-    settings_kwargs = dict(
+def _build_settings_kwargs(
+    args: argparse.Namespace,
+    *,
+    date_range_override: Optional[Tuple[date, date]] = None,
+) -> dict:
+    settings_kwargs: dict = dict(
         max_results_per_topic=args.max_results,
         send_email=args.send_email,
         receiver_email=args.receiver,
     )
     if args.topics:
         settings_kwargs["topics"] = args.topics
-    if args.date_range:
-        start_date, end_date = args.date_range
-        settings_kwargs["start_date"] = start_date
-        settings_kwargs["end_date"] = end_date
-    elif args.date is not None:
-        settings_kwargs["target_date"] = args.date
     if args.sources:
         settings_kwargs["sources"] = args.sources
     if args.keywords_file:
@@ -132,26 +144,151 @@ def main() -> None:
     settings_kwargs["fallback_report_limit"] = args.fallback_report_limit
     settings_kwargs["llm_max_workers"] = args.llm_workers
 
+    if date_range_override:
+        start_date, end_date = date_range_override
+        settings_kwargs["start_date"] = start_date
+        settings_kwargs["end_date"] = end_date
+    else:
+        if args.date_range:
+            start_date, end_date = args.date_range
+            settings_kwargs["start_date"] = start_date
+            settings_kwargs["end_date"] = end_date
+        elif args.date is not None:
+            settings_kwargs["target_date"] = args.date
+    return settings_kwargs
+
+
+def _run_pipeline(
+    settings_kwargs: dict,
+    *,
+    gap_fill_week: Optional[Tuple[date, date]] = None,
+    gap_fill_limit: Optional[int] = None,
+):
     settings = PipelineSettings(**settings_kwargs)
-    if args.gap_fill_week:
-        week_start, week_end = args.gap_fill_week
+    if gap_fill_week:
+        week_start, week_end = gap_fill_week
         result = generate_gap_fill_digest(
             settings,
             week_start=week_start,
             week_end=week_end,
-            max_candidates=args.gap_fill_limit,
+            max_candidates=gap_fill_limit,
         )
-        print(f"Gap-fill subject: {result.email_subject}")
-        print("Gap-fill report preview:")
+        subject_label = "Gap-fill subject"
+        preview_label = "Gap-fill report preview"
     else:
         result = generate_recommendations(settings)
-        print(f"Email subject: {result.email_subject}")
-        print("Email preview:")
+        subject_label = "Email subject"
+        preview_label = "Email preview"
+    return subject_label, preview_label, result
+
+
+def _print_result(
+    subject_label: str,
+    preview_label: str,
+    result,
+    *,
+    output_json: Optional[str] = None,
+    header: Optional[str] = None,
+) -> None:
+    if header:
+        print(header)
+    print(f"{subject_label}: {result.email_subject}")
+    print(f"{preview_label}:")
     print(result.email_body)
-    if args.output_json:
-        with open(args.output_json, "w", encoding="utf-8") as fh:
+    if output_json:
+        with open(output_json, "w", encoding="utf-8") as fh:
             fh.write(result.model_dump_json(indent=2))
-        print(f"Saved result to {args.output_json}")
+        print(f"Saved result to {output_json}")
+
+
+def run_once(args: argparse.Namespace) -> None:
+    settings_kwargs = _build_settings_kwargs(args)
+    gap_fill_week: Optional[Tuple[date, date]] = (
+        tuple(args.gap_fill_week) if args.gap_fill_week else None
+    )
+    subject_label, preview_label, result = _run_pipeline(
+        settings_kwargs,
+        gap_fill_week=gap_fill_week,
+        gap_fill_limit=args.gap_fill_limit,
+    )
+    _print_result(
+        subject_label,
+        preview_label,
+        result,
+        output_json=args.output_json,
+    )
+
+
+def run_service(args: argparse.Namespace) -> None:
+    repeat_days = args.repeat_every_days
+    if repeat_days is None:
+        raise ValueError("repeat_every_days must be provided for service mode.")
+    window_days = args.service_window_days or repeat_days
+    repeat_interval = timedelta(days=repeat_days)
+    next_run_time = datetime.now(timezone.utc)
+    logging.info(
+        "Starting daemon mode: interval=%s days, window=%s days. Next run at %s",
+        repeat_days,
+        window_days,
+        next_run_time.isoformat(),
+    )
+    iteration = 0
+    try:
+        while True:
+            now = datetime.now(timezone.utc)
+            if now < next_run_time:
+                sleep_seconds = max(1.0, (next_run_time - now).total_seconds())
+                time.sleep(sleep_seconds)
+                continue
+            iteration += 1
+            end_date = now.date()
+            start_date = end_date - timedelta(days=window_days - 1)
+            logging.info(
+                "Daemon iteration %s: generating report for %s - %s",
+                iteration,
+                start_date,
+                end_date,
+            )
+            settings_kwargs = _build_settings_kwargs(
+                args, date_range_override=(start_date, end_date)
+            )
+            subject_label, preview_label, result = _run_pipeline(settings_kwargs)
+            header = f"[daemon] iteration {iteration} ({start_date} to {end_date})"
+            _print_result(
+                subject_label,
+                preview_label,
+                result,
+                output_json=args.output_json,
+                header=header,
+            )
+            next_run_time = next_run_time + repeat_interval
+            if next_run_time <= now:
+                next_run_time = now + repeat_interval
+            logging.info("Next daemon run scheduled at %s", next_run_time.isoformat())
+    except KeyboardInterrupt:
+        logging.info("Daemon mode interrupted; exiting.")
+
+
+def main() -> None:
+    args = parse_args()
+    log_level = getattr(logging, str(args.log_level).upper(), logging.INFO)
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    )
+
+    if args.repeat_every_days is not None:
+        if args.gap_fill_week:
+            raise SystemExit("Daemon mode does not support --gap-fill-week.")
+        if args.service_window_days and args.service_window_days <= 0:
+            raise SystemExit("--service-window-days must be positive.")
+        if args.date_range or args.date:
+            logging.warning("Daemon mode ignores --date/--date-range; using rolling window.")
+        run_service(args)
+    else:
+        if args.service_window_days is not None:
+            raise SystemExit("--service-window-days requires --repeat-every-days.")
+        run_once(args)
 
 
 if __name__ == "__main__":  # pragma: no cover

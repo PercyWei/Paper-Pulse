@@ -25,10 +25,6 @@ from .keywords import resolve_keywords
 
 LOGGER = logging.getLogger(__name__)
 
-L1_REQUIRED_CATEGORIES = {"cs.CL", "cs.LG", "cs.AI"}
-L1_OPTIONAL_CATEGORIES = {"cs.CR", "cs.CY"}
-
-
 @dataclass
 class Layer1FilterOutcome:
     retained: List[RawPaper]
@@ -488,34 +484,12 @@ def apply_layer1_filters_with_trace(
 
 
 def filter_papers_by_categories(papers: Iterable[RawPaper]) -> List[RawPaper]:
-    required = {category.lower() for category in L1_REQUIRED_CATEGORIES}
-    optional = {category.lower() for category in L1_OPTIONAL_CATEGORIES}
     paper_list = list(papers)
-    retained: List[RawPaper] = []
-    missing_categories = 0
-    bypassed = 0
-    for paper in paper_list:
-        if paper.source != "arxiv":
-            retained.append(paper)
-            bypassed += 1
-            continue
-        categories = {category.lower() for category in paper.categories}
-        if not categories:
-            missing_categories += 1
-            continue
-        has_required = bool(categories & required)
-        has_optional = bool(categories & optional)
-        retained.append(paper)
-        # if has_required or has_optional:
-        #     retained.append(paper)
-    LOGGER.info(
-        "Category filter retained %d papers out of %d (skipped %d without categories, bypassed %d non-arXiv sources).",
-        len(retained),
+    LOGGER.debug(
+        "Category filtering is handled by individual fetchers; returning %d paper(s) unchanged.",
         len(paper_list),
-        missing_categories,
-        bypassed,
     )
-    return retained
+    return paper_list
 
 
 def filter_papers_by_keywords(papers: Iterable[RawPaper], keywords: Iterable[str]) -> List[RawPaper]:

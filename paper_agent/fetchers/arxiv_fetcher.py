@@ -1,25 +1,48 @@
 from __future__ import annotations
 
 import logging
+import time
 import urllib.parse
 from datetime import date, datetime, timedelta
-from typing import List, Optional, Set
+from typing import List, Optional, Sequence, Set
 
 import feedparser
+import requests
 from dateutil import parser as date_parser
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from ..models import RawPaper
 from .base import PaperFetcher
 
 LOGGER = logging.getLogger(__name__)
 ARXIV_RSS_API = "http://export.arxiv.org/api/query"
-
+REQUEST_TIMEOUT_SECONDS = 20
+REQUEST_MIN_INTERVAL_SECONDS = 10.0
+DEFAULT_MAX_RETRIES = 3
+RETRY_BACKOFF_FACTOR = 1.5
+RETRY_STATUS_FORCELIST = (429, 500, 502, 503, 504)
+DEFAULT_HEADERS = {
+    "User-Agent": "PaperPulseBot/1.1 (+https://github.com/yangjunxiao/paper-pulse; mailto:paper-pulse@yangjunxiao.dev)",
+    "Accept": "application/atom+xml; charset=utf-8",
+    "Accept-Encoding": "gzip, deflate",
+}
 
 class ArxivFetcher(PaperFetcher):
     source_name = "arxiv"
+    DEFAULT_CATEGORIES: tuple[str, ...] = ("cs.CL", "cs.LG", "cs.AI")
 
-    def __init__(self, page_size: int = 200) -> None:
+    def __init__(
+        self,
+        page_size: int = 200,
+        session: Optional[requests.Session] = None,
+        categories: Optional[Sequence[str]] = None,
+    ) -> None:
         self.page_size = page_size
+        self.categories: tuple[str, ...] = self._normalize_categories(categories)
+        self._category_clause: Optional[str] = self._build_category_clause(self.categories)
+        self.session = session or self._build_session()
+        self._last_request_ts: float = 0.0
 
     def fetch(
         self,
@@ -38,7 +61,11 @@ class ArxivFetcher(PaperFetcher):
     def fetch_by_date(self, target_date: date, max_results: Optional[int] = None) -> List[RawPaper]:
         start = target_date.strftime("%Y%m%d0000")
         end = target_date.strftime("%Y%m%d2359")
-        query = f"submittedDate:[{start} TO {end}]"
+        date_clause = f"submittedDate:[{start} TO {end}]"
+        if self._category_clause:
+            query = f"({date_clause}) AND ({self._category_clause})"
+        else:
+            query = date_clause
         LOGGER.info("Fetching arXiv papers for date %s using query '%s'", target_date.isoformat(), query)
         papers = self._fetch_with_query(search_query=query, max_results=max_results)
         LOGGER.info("Fetched %d arXiv papers for date %s", len(papers), target_date.isoformat())
@@ -97,8 +124,14 @@ class ArxivFetcher(PaperFetcher):
                 "sortBy": "submittedDate",
                 "sortOrder": "ascending",
             }
-            url = f"{ARXIV_RSS_API}?{urllib.parse.urlencode(params)}"
-            feed = feedparser.parse(url)
+            feed = self._request_feed(params)
+            if feed is None:
+                LOGGER.warning(
+                    "Stopping arXiv fetch due to repeated request failures. query='%s', start=%d",
+                    search_query,
+                    start_index,
+                )
+                break
             entries = getattr(feed, "entries", [])
             if not entries:
                 LOGGER.debug("No arXiv entries returned for query '%s' (start=%d).", search_query, start_index)
@@ -152,6 +185,78 @@ class ArxivFetcher(PaperFetcher):
         if not value:
             return datetime.utcnow()
         return date_parser.parse(value)
+
+    def _request_feed(self, params: dict) -> Optional[feedparser.FeedParserDict]:
+        self._respect_rate_limit()
+        try:
+            response = self.session.get(
+                ARXIV_RSS_API,
+                params=params,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            self._last_request_ts = time.monotonic()
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            LOGGER.warning("Failed to fetch arXiv feed: %s", exc)
+            self._last_request_ts = time.monotonic()
+            return None
+
+        feed = feedparser.parse(response.text)
+
+        status = getattr(feed, "status", response.status_code)
+        if status != 200:
+            LOGGER.warning("Unexpected arXiv response status: %s", status)
+        if getattr(feed, "bozo", False):
+            bozo_exception = getattr(feed, "bozo_exception", None)
+            LOGGER.debug("arXiv feed parsing issue: %s", bozo_exception)
+        return feed
+
+    def _respect_rate_limit(self) -> None:
+        if self._last_request_ts <= 0:
+            return
+        elapsed = time.monotonic() - self._last_request_ts
+        if elapsed < REQUEST_MIN_INTERVAL_SECONDS:
+            sleep_for = REQUEST_MIN_INTERVAL_SECONDS - elapsed
+            time.sleep(max(0.0, sleep_for))
+
+    @staticmethod
+    def _build_session() -> requests.Session:
+        session = requests.Session()
+        retry = Retry(
+            total=DEFAULT_MAX_RETRIES,
+            read=DEFAULT_MAX_RETRIES,
+            connect=DEFAULT_MAX_RETRIES,
+            backoff_factor=RETRY_BACKOFF_FACTOR,
+            status_forcelist=RETRY_STATUS_FORCELIST,
+            allowed_methods=frozenset({"GET"}),
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        for key, value in DEFAULT_HEADERS.items():
+            session.headers.setdefault(key, value)
+        return session
+
+    @staticmethod
+    def _normalize_categories(categories: Optional[Sequence[str]]) -> tuple[str, ...]:
+        if not categories:
+            return ArxivFetcher.DEFAULT_CATEGORIES
+        normalized = [str(category).strip() for category in categories if str(category).strip()]
+        if not normalized:
+            return ArxivFetcher.DEFAULT_CATEGORIES
+        unique = tuple(dict.fromkeys(normalized))
+        return unique
+
+    @staticmethod
+    def _build_category_clause(categories: Optional[Sequence[str]]) -> Optional[str]:
+        if not categories:
+            return None
+        clauses = [f"cat:{category}" for category in categories if category]
+        if not clauses:
+            return None
+        if len(clauses) == 1:
+            return clauses[0]
+        return " OR ".join(clauses)
 
 
 def _daterange(start: date, end: date):
