@@ -26,6 +26,8 @@ IFS=',' read -r -a SOURCES <<< "$SOURCES_CSV"
 
 RECEIVER="${RECEIVER:-yangjunx21@gmail.com}"
 
+export PYTHONPATH="$PROJECT_ROOT:${PYTHONPATH:-}"
+
 python -m paper_agent.cli \
     --intent-profile "$PROFILE_NAME" \
     --intent-config-dir "$INTENT_CONFIG_DIR" \

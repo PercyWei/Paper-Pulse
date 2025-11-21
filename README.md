@@ -1,6 +1,11 @@
 # Paper Pulse 🚀
 
+[![English](https://img.shields.io/badge/lang-English-blue.svg)](README.md) [![中文](https://img.shields.io/badge/lang-中文-red.svg)](README_zh-CN.md)
+
+![Paper Pulse Abstract](figs/abstract.jpg)
+
 **Paper Pulse** is a minimalistic yet powerful LLM-based system for academic paper discovery, classification, and summarization. It automates the pipeline of fetching papers from various sources (ArXiv, Hugging Face, etc.), filtering them based on user intent, analyzing them with LLMs, and delivering structured reports via email.
+
 
 ## ✨ Key Features
 
@@ -12,6 +17,8 @@
 - **Hybrid Ranking**: Sorts papers by a mix of LLM relevance scores and recency.
 - **Deep Analysis**: Downloads PDFs to extract full text and generate structured summaries (Context, Innovation, Methodology, Experiments).
 - **Email Delivery**: Sends beautifully formatted Markdown reports directly to your inbox.
+
+![Paper Pulse Framework](figs/framework.jpg)
 
 ## 🚀 Quick Start
 
@@ -43,13 +50,15 @@
    # OPENAI_BASE_URL=... (optional)
 
    # Email Settings (Required for email delivery)
-   EMAIL_HOST=smtp.gmail.com
-   EMAIL_PORT=587
+   EMAIL_HOST=smtp.gmail.com / smtp.163.com
+   EMAIL_PORT=587 / 465
    EMAIL_USERNAME=your-email@gmail.com
    EMAIL_PASSWORD=your-app-password
    EMAIL_SENDER=your-email@gmail.com
    EMAIL_RECEIVER=target-email@example.com
    ```
+
+   > **Note:** If you don't need email notifications, you can skip the `EMAIL_*` configuration. The generated reports will be saved locally in the `reports/` directory.
 
 ## 📖 Usage
 
@@ -67,6 +76,7 @@ Run the interactive builder to define your research interests.
 **Step 2: Run the Pipeline**
 Execute the pipeline using the profile you just created.
 ```bash
+# Set your profile name as an environment variable
 export PROFILE_NAME="my_research_focus"
 ./scripts/run_with_intent.sh
 ```
@@ -110,6 +120,19 @@ You can tweak the pipeline behavior via CLI arguments or the `.env` file. Key en
 - `OPENAI_API_KEY`: Your LLM API key.
 - `PAPER_PULSE_LANG`: Defaults to English.
 - `EMAIL_*`: SMTP settings for report delivery.
+
+## 🖊️ Citation
+
+If you find this project useful, please cite:
+
+```bibtex
+@misc{yang2025paperpulse,
+  title  = {Paper Pulse: An LLM-Based Academic Paper Discovery and Analysis System},
+  author = {Junxiao Yang},
+  year   = {2025},
+  url    = {https://github.com/yourusername/paper-pulse}
+}
+```
 
 ## 📄 License
 
