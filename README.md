@@ -127,6 +127,14 @@ You can tweak the pipeline behavior via CLI arguments or the `.env` file. Key en
 
 > **💡 Tip:** Enable `ENABLE_PDF_ANALYSIS=true` for much richer insights (Methodology, Experiments, etc.), but it will consume more tokens and time.
 
+## 🤝 Contribution
+
+Contributions are welcome! If you have any questions, suggestions, or find any issues, please feel free to open an issue or submit a pull request. 
+
+If you find this project helpful, please give it a ⭐️ Star!
+
+📧 **Contact:** yangjunx21@gmail.com
+
 ## 🖊️ Citation
 
 If you find this project useful, please cite:
