@@ -28,6 +28,8 @@ jobs:
     - name: Run Paper Pulse
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+        OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL}}
         EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
         EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
         EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}
