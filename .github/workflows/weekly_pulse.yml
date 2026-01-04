@@ -1,8 +1,9 @@
-name: Daily Paper Pulse
+name: Weekly Paper Pulse
 
 on:
   schedule:
-    - cron: '0 0 * * *'
+    # 每周一 北京早上 8 点
+    - cron: '0 0 * * 1'
   workflow_dispatch:
 
 jobs:
@@ -37,6 +38,13 @@ jobs:
         EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
         EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
         PROFILE_NAME: "interpretability"
+        MAX_RESULTS: "50"
       run: |
         chmod +x ./scripts/run_with_intent.sh
+
+        export DATE_RANGE_END=$(date +%Y-%m-%d)
+        export DATE_RANGE_START=$(date -d "7 days ago" +%Y-%m-%d)
+        
+        echo "Running weekly report from $DATE_RANGE_START to $DATE_RANGE_END"
+        
         ./scripts/run_with_intent.sh
