@@ -1,0 +1,38 @@
+{
+  "name": "interpretability",
+  "description": "Research on LLM interpretability focusing on learning dynamics, internal representations, and safety-related behaviors.",
+  "topics": [
+    "LLM interpretability",
+    "Learning dynamics",
+    "Safety mechanisms"
+  ],
+  "keywords": [
+    "Interpretability",
+    "Mechanistic insights",
+    "Learning dynamics",
+    "Internal representations",
+    "Behavioral evolution",
+    "Training processes",
+    "Safety analysis",
+    "Refusal mechanisms",
+    "Jailbreaking",
+    "Bias detection",
+    "Activation pathways",
+    "Attention heads",
+    "Gradient analysis",
+    "Feature attribution",
+    "Neuron behavior",
+    "Model internals",
+    "Safety phenomena",
+    "Behavioral alignment",
+    "Representation learning",
+    "Theoretical insights"
+  ],
+  "required_keywords": [
+    "LLM",
+    "Generative AI"
+  ],
+  "notes": "Focus on bridging low-level model internals with high-level safety and behavioral phenomena in LLMs.",
+  "created_at": "2026-01-04T14:48:23.381768+00:00",
+  "updated_at": "2026-01-04T14:48:23.381768+00:00"
+}
