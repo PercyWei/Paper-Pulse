@@ -42,12 +42,17 @@ class EmailClient:
         message.add_alternative(html_body, subtype="html")
 
         ssl_context = ssl.create_default_context()
-
-        with smtplib.SMTP_SSL(self.config.host, self.config.port, context=ssl_context) as server:
         
+        server = smtplib.SMTP_SSL(self.config.host, self.config.port, context=ssl_context)
+        try:
             server.login(self.config.username, self.config.password)
             server.send_message(message)
             print(f"Email sent successfully to {target}!")
+        finally:
+            try:
+                server.quit()
+            except smtplib.SMTPException:
+                pass
 
     @staticmethod
     def _markdown_to_html(markdown_text: str) -> str:
