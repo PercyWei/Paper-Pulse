@@ -337,8 +337,8 @@ def generate_recommendations(settings: PipelineSettings) -> PipelineResult:
             summary_step_index,
             total_steps,
         )
-    log_step("Building daily report content")
-    email_subject, email_body = build_daily_report(
+    log_step("Building report content")
+    email_subject, email_body = build_report(
         relevant_ranked,
         focus,
         date_descriptor,
@@ -468,7 +468,7 @@ def generate_gap_fill_digest(
             missing_summaries,
         )
     date_descriptor = f"{week_start.isoformat()} to {week_end.isoformat()} (keyword gap-fill)"
-    email_subject, email_body = build_daily_report(
+    email_subject, email_body = build_report(
         relevant_ranked,
         focus,
         date_descriptor,
@@ -740,10 +740,7 @@ def filter_papers_by_keywords(papers: Iterable[RawPaper], keywords: Iterable[str
     return filtered
 
 
-def filter_papers_by_required_keywords(
-    papers: Iterable[RawPaper],
-    required_keywords: Iterable[str],
-) -> List[RawPaper]:
+def filter_papers_by_required_keywords(papers: Iterable[RawPaper], required_keywords: Iterable[str]) -> List[RawPaper]:
     required_list = [keyword.strip().lower() for keyword in required_keywords if str(keyword).strip()]
     paper_list = list(papers)
     if not required_list:
@@ -950,7 +947,7 @@ def classify_with_llm(
     return results
 
 
-def build_daily_report(
+def build_report(
     ranked: Sequence[RankedPaper],
     focus: str,
     date_descriptor: str,
@@ -1005,9 +1002,9 @@ def build_daily_report(
         return " ".join(value.split())
 
     ranked_list = list(ranked)
-    subject = f"Daily LLM Safety Paper Digest ({date_descriptor})"
+    subject = f"LLM Safety Paper Digest ({date_descriptor})"
     lines: List[str] = [
-        f"# Daily LLM Safety Paper Digest ({date_descriptor})",
+        f"# LLM Safety Paper Digest ({date_descriptor})",
         "",
         f"*Research Focus:* {focus or 'LLM Safety'}",
         f"*Data Sources:* {sources_descriptor or 'Unknown'}",
